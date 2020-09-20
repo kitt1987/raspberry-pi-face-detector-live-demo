@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <title>CloudToGo Target Track Live Demo</title>
+    <meta charset="UTF-8" />
+    <meta name="description" content="🍓" />
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+    <script type="text/javascript" src="http://api.map.baidu.com/getscript?v=3.0&ak=tlE4Dt7y5TAhlch3XFO3bmlkTREMUeVs"></script>
+    <script src="https://rawgit.com/enyo/dropzone/master/dist/dropzone.js"></script>
+    <link rel="stylesheet" href="https://rawgit.com/enyo/dropzone/master/dist/dropzone.css">
+    <style>
+        html, body {
+          height: 100%;
+          margin: 0;
+          overflow: hidden;
+        }
+
+        .fill {
+            min-height: 100%;
+            height: 100%;
+        }
+
+        .imagePreview {
+          width: 100%;
+          min-width: 100%;
+          height: 360px;
+          background:url(https://icon-library.com/images/facial-recognition-icon/facial-recognition-icon-26.jpg);
+          background-color:rgba(255,255,255,0.2);
+          background-size: 160px 160px;
+          background-repeat:no-repeat;
+          background-position: center center;
+          border-style: dashed;
+          border-radius: 5px;
+          border-color: #212529;
+          border-width: 2px;
+          display: flex;
+          align-items: center;
+          justify-content: space-around;
+          padding-right: 24px;
+          overflow: hidden;
+        }
+
+        #frame {
+            height: 300px;
+            position: absolute;
+            left: 80px;
+            top: 230px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <a class="navbar-brand" href="#">CloudToGo Target Track Live Demo</a>
+    <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav mr-auto">
+            <li class="nav-item">
+                <a class="nav-link" href="#"></a>
+            </li>
+        </ul>
+        <span>🍓</span>
+    </div>
+</nav>
+<div class="container-fluid fill">
+    <div class="row justify-content-around mt-3 fill">
+        <div id="monkey" class="col-sm-3 shadow p-3 m-1 bg-white fill">
+            <p class="lead">Target</p>
+            <div id="previews" class="imagePreview">
+                <span class="preview"><img data-dz-thumbnail /></span>
+            </div>
+        </div>
+
+        <div id="sidecar" class="col-sm-8 p-3 m-1 bg-white fill">
+            <p class="lead">Most Recent Frames and Position</p>
+            <div id="map" class="fill"></div>
+            <img id="frame" class="img-thumbnail float-left shadow">
+        </div>
+    </div>
+</div>
+<script>
+        var myDropzone = new Dropzone("div#previews", {
+            url: "/upload_target",
+            thumbnailWidth: 360,
+            thumbnailHeight: 360,
+            paramName: "file",
+            previewsContainer: "#previews",
+            previewTemplate: document.querySelector("#previews").innerHTML,
+        });
+
+      var map = new BMap.Map("map");
+      var point = new BMap.Point(113.951258,22.554297);
+      map.centerAndZoom(point,15);
+
+      function drawPosition() {
+        var geolocation = new BMap.Geolocation();
+        geolocation.enableSDKLocation();
+        geolocation.getCurrentPosition(function(r){
+            if(this.getStatus() == BMAP_STATUS_SUCCESS){
+                var mk = new BMap.Marker(r.point);
+                map.addOverlay(mk);
+                map.panTo(r.point);
+                map.centerAndZoom(r.point, 15);
+            }
+        });
+      }
+
+      function showFrame(image) {
+        var frame = document.getElementById("frame");
+        frame.src = image;
+        frame.style.display = "block";
+      }
+
+      function connectConsole() {
+		var wsPrefx = "ws://"
+		if (window.location.protocol == "https:") {
+			wsPrefx = "wss://"
+		}
+
+        monkey = new WebSocket(wsPrefx + window.location.host + "/monkey");
+        monkey.onmessage = function (e) {
+            drawPosition();
+            showFrame(e.data);
+        };
+      }
+
+      connectConsole();
+    </script>
+</body>
+</html>

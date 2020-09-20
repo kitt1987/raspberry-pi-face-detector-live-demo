@@ -102,16 +102,17 @@ def capture():
                 font = cv2.FONT_HERSHEY_DUPLEX
                 cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
 
+        cv2.namedWindow("Video", cv2.WND_PROP_FULLSCREEN)
+        cv2.setWindowProperty("Video",cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
         # Display the resulting image
         cv2.imshow('Video', frame)
 
-        # Hit 'q' on the keyboard to quit!
+        # Hit any key to quit!
         if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    # Release handle to the webcam
-    video_capture.release()
-    cv2.destroyAllWindows()
+            # Release handle to the webcam
+            video_capture.release()
+            cv2.destroyAllWindows()
+            os._exit(0)
 
 if __name__ == '__main__':
     threading.Thread(target=scanDetector).start()

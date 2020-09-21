@@ -24,10 +24,11 @@ class HTTPRequestHandler(server.SimpleHTTPRequestHandler):
     def do_POST(self):
         filename = Path(os.path.basename(self.path))
         file_length = int(self.headers['Content-Length'])
-        self.send_response(201, 'Created')
-        self.end_headers()
         if str(filename) == 'frame.jpg':
-            self.wfile.write(detect(self.rfile.read(file_length)).encode('utf-8'))
+            result = detect(self.rfile.read(file_length)).encode('utf-8')
+            self.send_response(201, 'Created')
+            self.end_headers()
+            self.wfile.write(result)
         else:
             output = PurePosixPath('/tmp').joinpath(filename.name)
             with open(str(output), 'wb') as output_file:
@@ -36,6 +37,8 @@ class HTTPRequestHandler(server.SimpleHTTPRequestHandler):
             # with faceLock:
             known_face_encodings.append(imageEncoding)
             known_face_names.append(str(filename.with_suffix('')))
+            self.send_response(201, 'Created')
+            self.end_headers()
 
 class MTHTTPServer(ThreadingMixIn, HTTPServer):
     pass

@@ -1,3 +1,5 @@
+import face_recognition
+import io
 import threading
 import cv2
 import os
@@ -42,9 +44,35 @@ def scanDetector():
             global detectorIP
             detectorIP = getConcernedContainerIP()
         except:
-            print('error on container scanning')
+            pass
         time.sleep(5)
         
+
+def detectLocally(frame):
+    # Initialize some variables
+    face_locations = []
+    face_encodings = []
+    face_names = []
+
+    # Rotate 90 degrees
+    #frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+    # Resize frame of video to 1/4 size for faster face recognition processing
+    small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+
+    # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
+    rgb_small_frame = small_frame[:, :, ::-1]
+
+    # Find all the faces and face encodings in the current frame of video
+    face_locations = face_recognition.face_locations(rgb_small_frame)
+    
+    # Display the results
+    text = ''
+    for (top, right, bottom, left) in face_locations:
+        text += '{},{},{},{},{}'.format(top*4, right*4, bottom*4, left*4, "Unknown")
+        text += "\n"
+
+    return text
 
 def uploadAndDetect(image):
     if detectorIP == '':
@@ -53,11 +81,10 @@ def uploadAndDetect(image):
     try:
         url='http://{}/frame.jpg'.format(detectorIP)
         is_success, bytes = cv2.imencode(".jpg", image)
-        r=requests.post(url,data=io.BytesIO(bytes))
+        r=requests.post(url,data=io.BytesIO(bytes), timeout=0.5)
         return r.text
     except:
-        print("error arose when saving captures")
-        return ""
+        return detectLocally(image)
 
 def capture():
     # Get a reference to webcam #0 (the default one)
@@ -74,7 +101,7 @@ def capture():
         ret, frame = video_capture.read()
 
         # Rotate 90 degrees
-        frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        #frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
         detectResult = ''
         if process_this_frame:

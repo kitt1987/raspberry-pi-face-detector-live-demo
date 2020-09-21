@@ -5,7 +5,8 @@ import numpy as np
 import os
 import time
 import http.server as server
-import socketserver
+from http.server import HTTPServer
+from socketserver import ThreadingMixIn
 import requests
 from pathlib import Path, PurePosixPath
 
@@ -17,6 +18,9 @@ lastCaptureTs = 0
 captureInterval = int(os.environ.get('CAPTURE_INTERVAL'))
 
 class HTTPRequestHandler(server.SimpleHTTPRequestHandler):
+    def log_request(self, format, *args):
+        return
+
     def do_POST(self):
         filename = Path(os.path.basename(self.path))
         file_length = int(self.headers['Content-Length'])
@@ -33,9 +37,11 @@ class HTTPRequestHandler(server.SimpleHTTPRequestHandler):
             known_face_encodings.append(imageEncoding)
             known_face_names.append(str(filename.with_suffix('')))
 
+class MTHTTPServer(ThreadingMixIn, HTTPServer):
+    pass
 
 def httpServer():
-    server = socketserver.TCPServer(("", 80), HTTPRequestHandler)
+    server = MTHTTPServer(("", 80), HTTPRequestHandler)
     server.serve_forever()
 
 def uploadCapture(image):
@@ -61,7 +67,6 @@ def detect(frameBytes):
     face_locations = []
     face_encodings = []
     face_names = []
-    process_this_frame = True
 
     # Grab a single frame of video
     #frame = cv2.imread(framePath)

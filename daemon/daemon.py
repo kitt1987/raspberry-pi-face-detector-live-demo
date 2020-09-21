@@ -92,7 +92,6 @@ def capture():
 
     # Initialize some variables
     face_locations = []
-    face_encodings = []
     face_names = []
     process_this_frame = True
 
@@ -101,15 +100,15 @@ def capture():
         ret, frame = video_capture.read()
 
         # Rotate 90 degrees
-        #frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
         detectResult = ''
         if process_this_frame:
             detectResult = uploadAndDetect(frame)
-
-        process_this_frame = not process_this_frame
-
-        if len(detectResult) > 0:
+            if len(detectResult) > 0:
+                face_locations = []
+                face_names = []
+            
             for face in detectResult.splitlines():
                 face = face.strip()
                 if len(face) == 0:
@@ -119,15 +118,21 @@ def capture():
                 right = int(pos[1])
                 bottom = int(pos[2])
                 left = int(pos[3])
-                name = pos[4]
-                # Display the results
-                # Draw a box around the face
-                cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
+                face_locations.append((top, right, bottom, left))
+                face_names.append(pos[4])
 
-                # Draw a label with a name below the face
-                cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
-                font = cv2.FONT_HERSHEY_DUPLEX
-                cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
+
+        process_this_frame = not process_this_frame            
+
+        # Display the results
+        for (top, right, bottom, left), name in zip(face_locations, face_names):
+            # Draw a box around the face
+            cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
+
+            # Draw a label with a name below the face
+            cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
+            font = cv2.FONT_HERSHEY_DUPLEX
+            cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
 
         cv2.namedWindow("Video", cv2.WND_PROP_FULLSCREEN)
         cv2.setWindowProperty("Video",cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)

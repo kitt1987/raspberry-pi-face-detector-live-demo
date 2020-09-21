@@ -53,8 +53,7 @@ def uploadAndDetect(image):
     try:
         cv2.imwrite("frame.jpg", image)
         url='http://{}/frame.jpg'.format(detectorIP)
-        files={'file': open('frame.jpg','rb')}
-        r=requests.post(url,files=files)
+        r=requests.post(url,data=open('frame.jpg', 'rb'))
         return r.text
     except:
         print("error arose when saving captures")
@@ -89,10 +88,10 @@ def capture():
                 if len(face) == 0:
                     continue
                 pos = face.split(',')
-                top = pos[0]
-                right = pos[1]
-                bottom = pos[2]
-                left = pos[3]
+                top = int(pos[0])
+                right = int(pos[1])
+                bottom = int(pos[2])
+                left = int(pos[3])
                 name = pos[4]
                 # Display the results
                 # Draw a box around the face

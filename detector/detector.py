@@ -20,14 +20,14 @@ class HTTPRequestHandler(server.SimpleHTTPRequestHandler):
     def do_POST(self):
         filename = Path(os.path.basename(self.path))
         file_length = int(self.headers['Content-Length'])
-        output = PurePosixPath('/tmp').joinpath(filename.name)
-        with open(output, 'wb') as output_file:
-            output_file.write(self.rfile.read(file_length))
         self.send_response(201, 'Created')
         self.end_headers()
-        if filename == 'frame.jpg':
-            self.wfile.write(detect(output).encode('utf-8'))
+        if str(filename) == 'frame.jpg':
+            self.wfile.write(detect(self.rfile.read(file_length)).encode('utf-8'))
         else:
+            output = PurePosixPath('/tmp').joinpath(filename.name)
+            with open(str(output), 'wb') as output_file:
+                output_file.write(self.rfile.read(file_length))
             imageEncoding = face_recognition.face_encodings(face_recognition.load_image_file(str(output)))[0]
             # with faceLock:
             known_face_encodings.append(imageEncoding)
@@ -35,13 +35,8 @@ class HTTPRequestHandler(server.SimpleHTTPRequestHandler):
 
 
 def httpServer():
-    try:
-        server = socketserver.TCPServer(("", 80), HTTPRequestHandler)
-        server.serve_forever()
-    except:
-        pass
-    finally:
-        server.close()
+    server = socketserver.TCPServer(("", 80), HTTPRequestHandler)
+    server.serve_forever()
 
 def uploadCapture(image):
     try:
@@ -61,7 +56,7 @@ def uploadCapture(image):
     except:
         print("error arose when saving captures")
 
-def detect(framePath):
+def detect(frameBytes):
     # Initialize some variables
     face_locations = []
     face_encodings = []
@@ -69,7 +64,8 @@ def detect(framePath):
     process_this_frame = True
 
     # Grab a single frame of video
-    frame = cv2.imread(framePath)
+    #frame = cv2.imread(framePath)
+    frame = cv2.imdecode(np.frombuffer(frameBytes, np.uint8), -1)
 
     # Rotate 90 degrees
     #frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
@@ -123,4 +119,6 @@ def detect(framePath):
     return text
 
 if __name__ == '__main__':
-    httpServer()
+    # httpServer()
+    # imageEncoding = face_recognition.face_encodings(face_recognition.load_image_file(str(output)))[0]
+    face_recognition.load_image_file('/tmp/avatar.jpg')

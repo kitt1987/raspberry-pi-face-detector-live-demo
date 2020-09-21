@@ -35,8 +35,13 @@ class HTTPRequestHandler(server.SimpleHTTPRequestHandler):
 
 
 def httpServer():
-    with socketserver.TCPServer(("", 80), HTTPRequestHandler) as httpd:
-        httpd.serve_forever()
+    try:
+        server = socketserver.TCPServer(("", 80), HTTPRequestHandler)
+        server.serve_forever()
+    except:
+        pass
+    finally:
+        server.close()
 
 def uploadCapture(image):
     try:

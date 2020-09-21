@@ -119,6 +119,4 @@ def detect(frameBytes):
     return text
 
 if __name__ == '__main__':
-    # httpServer()
-    # imageEncoding = face_recognition.face_encodings(face_recognition.load_image_file(str(output)))[0]
-    face_recognition.load_image_file('/tmp/avatar.jpg')
+    httpServer()

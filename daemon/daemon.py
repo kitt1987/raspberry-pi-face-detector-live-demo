@@ -51,9 +51,9 @@ def uploadAndDetect(image):
         return ""
 
     try:
-        cv2.imwrite("frame.jpg", image)
         url='http://{}/frame.jpg'.format(detectorIP)
-        r=requests.post(url,data=open('frame.jpg', 'rb'))
+        is_success, bytes = cv2.imencode(".jpg", image)
+        r=requests.post(url,data=io.BytesIO(bytes))
         return r.text
     except:
         print("error arose when saving captures")

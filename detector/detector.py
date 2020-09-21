@@ -25,7 +25,7 @@ class HTTPRequestHandler(server.SimpleHTTPRequestHandler):
             output_file.write(self.rfile.read(file_length))
         self.send_response(201, 'Created')
         self.end_headers()
-        if filename == 'frame':
+        if filename == 'frame.jpg':
             self.wfile.write(detect(output).encode('utf-8'))
         else:
             imageEncoding = face_recognition.face_encodings(face_recognition.load_image_file(str(output)))[0]

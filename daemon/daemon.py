@@ -39,6 +39,7 @@ def getConcernedContainerIP():
 def scanDetector():
     while True:
         try:
+            global detectorIP
             detectorIP = getConcernedContainerIP()
         except:
             print('error on container scanning')
@@ -50,9 +51,9 @@ def uploadAndDetect(image):
         return ""
 
     try:
-        cv2.imwrite("frame", image)
-        url='http://{}/frame'.format(detectorIP)
-        files={'file': open('frame','rb')}
+        cv2.imwrite("frame.jpg", image)
+        url='http://{}/frame.jpg'.format(detectorIP)
+        files={'file': open('frame.jpg','rb')}
         r=requests.post(url,files=files)
         return r.text
     except:

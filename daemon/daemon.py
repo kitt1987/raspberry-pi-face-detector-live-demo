@@ -40,11 +40,11 @@ def getConcernedContainerIP():
 
 def scanDetector():
     while True:
+        global detectorIP
         try:
-            global detectorIP
             detectorIP = getConcernedContainerIP()
         except:
-            pass
+            detectorIP = ''
         time.sleep(5)
         
 
@@ -105,9 +105,8 @@ def capture():
         detectResult = ''
         if process_this_frame:
             detectResult = uploadAndDetect(frame)
-            if len(detectResult) > 0:
-                face_locations = []
-                face_names = []
+            face_locations = []
+            face_names = []
             
             for face in detectResult.splitlines():
                 face = face.strip()

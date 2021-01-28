@@ -1,2 +1,2 @@
 FROM registry.local/face_recognition:sixsq
-RUN pip3 install requests docker python-dateutil pillow==4.0.0
+RUN pip3 install protobuf grpcio requests docker python-dateutil pillow==4.0.0

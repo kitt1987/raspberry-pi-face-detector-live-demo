@@ -1,4 +1,5 @@
-FROM registry.local/face_recognition-base:sixsq
+FROM registry.local/face_recognition-base:sixsq-rpc
 WORKDIR /root
-ADD daemon.py .
-ENTRYPOINT ["python3", "/root/daemon.py"]
+ADD daemon/daemon.py ./daemon/daemon.py
+ADD rpc ./rpc
+ENTRYPOINT ["python3", "-u", "/root/daemon/daemon.py"]

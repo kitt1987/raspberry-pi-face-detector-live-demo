@@ -1,150 +1,213 @@
-import face_recognition
-import io
-import threading
 import cv2
+import numpy as np
+from io import BytesIO
+import traceback
+
+import grpc
+import sys
 import os
+from concurrent import futures
+import threading
 import time
-import requests
-import docker
-from dateutil.parser import parse
 
-detectorIP = ''
+sys.path.append("rpc")
+import face_pb2
+import face_pb2_grpc
 
-def getContainerIP(hostnamePath, hostsPath):
-    hostname = ''
-    with open(hostnamePath, 'r') as file:
-        hostname = file.read().rstrip()
+if 'GRPC_HOST' in os.environ:
+    _HOST = os.environ['GRPC_HOST']
+else:
+    _HOST = '0.0.0.0'
 
-    with open(hostsPath, 'r') as file:
-        lines = file.readlines()
-        for line in lines:
-            line = line.strip()
-            if line.endswith(hostname):
-                return line[:-1*len(hostname)].strip()
+if 'GPRC_HOST' in os.environ:
+    _PORT = os.environ['GRPC_HOST']
+else:
+    _PORT = '9900'
 
-def getConcernedContainerIP():
-    startedAt = 0
-    hostnamePath = ''
-    hostsPath = ''
-    client = docker.from_env()
-    for container in client.containers.list(filters={"ancestor": os.environ.get('TARGET_IMAGE')}):
-        startTs = parse(container.attrs['State']['StartedAt']).timestamp()
-        if startTs < startedAt:
-            continue
+if 'GRPC_WORKER' in os.environ:
+    _RPC_WORKER = int(os.environ['GRPC_WORKER'])
+else:
+    _RPC_WORKER = 2
 
-        startedAt = startTs
-        hostnamePath = container.attrs['HostnamePath']
-        hostsPath = container.attrs['HostsPath']
-        
-    return getContainerIP(hostnamePath, hostsPath)
+if 'ROTATE' in os.environ:
+    rotate = int(os.environ['ROTATE'])
+else:
+    rotate = 1
 
-def scanDetector():
-    while True:
-        global detectorIP
+if 'LEFT' in os.environ:
+    left = int(os.environ['LEFT'])
+else:
+    left = 0
+
+if 'TOP' in os.environ:
+    top = int(os.environ['TOP'])
+else:
+    top = 0
+# Global value shared with multithreading
+gframe = []
+face_names = []
+face_locations = []
+isExit = False
+called = 0
+
+
+def encode_frame(pb_frame):
+    # numpy to bytes
+    nda_bytes = BytesIO()
+    np.save(nda_bytes, pb_frame, allow_pickle=False)
+    return nda_bytes
+
+
+def decode_frame(nda_bytes):
+    # bytes to numpy
+    nda_bytes = BytesIO(nda_proto.ndarray)
+    return np.load(nda_bytes, allow_pickle=False)
+
+
+class FaceService(face_pb2_grpc.FaceServiceServicer):
+    def GetFrame(self, request, context):
+        global gframe
         try:
-            detectorIP = getConcernedContainerIP()
-        except:
-            detectorIP = ''
-        time.sleep(5)
-        
+            frame_process = gframe
 
-def detectLocally(frame):
-    # Initialize some variables
-    face_locations = []
-    face_encodings = []
-    face_names = []
+            # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
+            rgb_frame = frame_process[:, :, ::-1]
 
-    # Rotate 90 degrees
-    #frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+            byteFrame = encode_frame(rgb_frame).getvalue()
 
-    # Resize frame of video to 1/4 size for faster face recognition processing
-    small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+            return face_pb2.Frame(
+                ID=request.ID,
+                Rgb_small_frame=byteFrame,
+                Status=face_pb2.STATUS_OK,
+            )
 
-    # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
-    rgb_small_frame = small_frame[:, :, ::-1]
+        except Exception as ex:
+            traceback.print_exc()
 
-    # Find all the faces and face encodings in the current frame of video
-    face_locations = face_recognition.face_locations(rgb_small_frame)
-    
-    # Display the results
-    text = ''
-    for (top, right, bottom, left) in face_locations:
-        text += '{},{},{},{},{}'.format(top*4, right*4, bottom*4, left*4, "Unknown")
-        text += "\n"
+    def DisplayLocations(self, request, context):
+        try:
+            message = request
+            global face_names
+            global face_locations
+            global called
+            l_face_names = message.Face_names
+            l_face_locations = []
+            for i in range(0, len(message.Face_locations)):
+                l_face_locations.append(tuple(message.Face_locations[i].Loc))
+            # print(message.Face_locations)
 
-    return text
+            face_names = l_face_names
+            face_locations = l_face_locations
 
-def uploadAndDetect(image):
-    if detectorIP == '':
-        return ""
+            called = called + 1
 
-    try:
-        url='http://{}/frame.jpg'.format(detectorIP)
-        is_success, bytes = cv2.imencode(".jpg", image)
-        r=requests.post(url,data=io.BytesIO(bytes), timeout=0.5)
-        return r.text
-    except:
-        return detectLocally(image)
+            return face_pb2.LocationResponse(
+                Status=face_pb2.STATUS_OK,
+            )
+        except grpc.RpcError as rpc_error_call:
+            details = rpc_error_call.details()
+            print("err='RPCError DisplayLocations'")
+            print("errMore=\"" + details + "\"")
+        except Exception as ex:
+            traceback.print_exc()
 
-def capture():
-    # Get a reference to webcam #0 (the default one)
-    video_capture = cv2.VideoCapture(0)
 
-    # Initialize some variables
-    face_locations = []
-    face_names = []
-    process_this_frame = True
+def serve():
+    print("start serving rpc")
+    grpcServer = grpc.server(futures.ThreadPoolExecutor(max_workers=_RPC_WORKER))
+    face_pb2_grpc.add_FaceServiceServicer_to_server(FaceService(), grpcServer)
 
+    grpcServer.add_insecure_port("{0}:{1}".format(_HOST, _PORT))
+    grpcServer.start()
+    print("waiting for incomming connection at {0}:{1}".format(_HOST, _PORT))
+    # grpcServer.wait_for_termination()
     while True:
-        # Grab a single frame of video
-        ret, frame = video_capture.read()
+        if isExit:
+            print("stop rpc server!")
+            break
 
-        # Rotate 90 degrees
-        frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
-        detectResult = ''
-        if process_this_frame:
-            detectResult = uploadAndDetect(frame)
+def displayResult(frame_process):
+    global face_locations
+    global face_names
+    # Display the results
+    for (top, right, bottom, left), name in zip(face_locations, face_names):
+        # Draw a box around the face
+        cv2.rectangle(frame_process, (left, top), (right, bottom), (0, 0, 255), 2)
+
+        # Draw a label with a name below the face
+        cv2.rectangle(frame_process, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
+        font = cv2.FONT_HERSHEY_DUPLEX
+        cv2.putText(frame_process, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
+    return frame_process
+
+
+# exit fullscreen will click by mouse
+def onMouse(event, x, y, flags, param):
+    print(x, y)
+
+
+def capture1():
+    try:
+        global gframe
+        # Get a reference to webcam #0 (the default one)
+        video_capture = cv2.VideoCapture(0)
+
+        # Initialize some variables
+        process_this_frame = True
+
+        cv2.namedWindow("Video", flags=1)  # cv2.WINDOW_AUTOSIZE)
+        cv2.setWindowProperty("Video", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
+
+        video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 480)
+        video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
+        # cv2.moveWindow("Video", left, top)
+
+        while True:
+            # Grab a single frame of video
+            ret, frame = video_capture.read()
+            # overturn the frame
+            if rotate:
+                frame = cv2.flip(frame, 1)
+                frame = cv2.rotate(frame, rotate)
+
+            if process_this_frame:
+                gframe = frame
+
+            frame = displayResult(frame)
+            process_this_frame = not process_this_frame
+
+            # Display the resulting image
+            cv2.imshow('Video', frame)
+
+            # Hit any key to quit!
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                # Release handle to the webcam
+                video_capture.release()
+                cv2.destroyAllWindows()
+                global isExit
+                isExit = True
+                sys.exit()
+    except Exception as ex:
+        traceback.print_exc()
+        sys.exit()
+
+
+def ping():
+    while True:
+        global face_locations
+        last = called
+        time.sleep(3)
+        if last == called:
+            # print("connetion from client closed, clean face_location")
             face_locations = []
-            face_names = []
-            
-            for face in detectResult.splitlines():
-                face = face.strip()
-                if len(face) == 0:
-                    continue
-                pos = face.split(',')
-                top = int(pos[0])
-                right = int(pos[1])
-                bottom = int(pos[2])
-                left = int(pos[3])
-                face_locations.append((top, right, bottom, left))
-                face_names.append(pos[4])
 
 
-        process_this_frame = not process_this_frame            
+def run():
+    threading.Thread(target=ping).start()
+    threading.Thread(target=capture1).start()
+    serve()
 
-        # Display the results
-        for (top, right, bottom, left), name in zip(face_locations, face_names):
-            # Draw a box around the face
-            cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
-
-            # Draw a label with a name below the face
-            cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
-            font = cv2.FONT_HERSHEY_DUPLEX
-            cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
-
-        cv2.namedWindow("Video", cv2.WND_PROP_FULLSCREEN)
-        cv2.setWindowProperty("Video",cv2.WND_PROP_FULLSCREEN,cv2.WINDOW_FULLSCREEN)
-        # Display the resulting image
-        cv2.imshow('Video', frame)
-
-        # Hit any key to quit!
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            # Release handle to the webcam
-            video_capture.release()
-            cv2.destroyAllWindows()
-            os._exit(0)
 
 if __name__ == '__main__':
-    threading.Thread(target=scanDetector).start()
-    capture()
+    run()

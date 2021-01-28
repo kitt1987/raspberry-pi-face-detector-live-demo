@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+enum EnumFaceSvcStatus {
+    INVALID = 0;
+    STATUS_OK = 1;
+    NO_ENOUGH_ARGUMENT = 2;
+    PARTIAL_FAILURE = 3;
+    PERMISSION_DENIED = 4;
+}
+
+message Frame {
+    string ID = 1;
+    bytes Rgb_small_frame = 2;
+    EnumFaceSvcStatus Status = 3;
+    string Error = 4;
+}
+
+
+message FrameRequest{
+    string ID = 1;
+}
+
+message Location{
+    repeated int32 Loc=1;
+}
+
+message Locations {
+    string ID = 1;
+    repeated Location Face_locations = 2;
+    repeated string Face_names = 3;
+    bytes Rgb_small_frame = 4;
+}
+
+message LocationResponse{
+    EnumFaceSvcStatus Status = 1;
+    string Error = 2;
+}
+
+service FaceService {
+    rpc GetFrame(FrameRequest) returns (Frame) {}
+
+    rpc DisplayLocations(Locations) returns (LocationResponse) {}
+}
